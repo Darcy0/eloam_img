@@ -9,12 +9,9 @@ extern "C" CAMERADEV_API int _cdecl ggcaInit( int iDeviceNum )
 	int iRet=-1;
 	if (!g_isInit)
 	{//初始化设备
+		g_deviceCnt=0;
 		EloamGlobal_InitDevs(DevChangeCallback,NULL);
 		g_isInit=true;
-	}
-	if (iDeviceNum<0||iDeviceNum>g_maxDeviceNum)
-	{//设备序号不合理
-		return iRet;
 	}
 	int vecIndex=0;
 	DevInfo *pDevInfo=GetDevInfo(iDeviceNum,vecIndex);
@@ -24,28 +21,30 @@ extern "C" CAMERADEV_API int _cdecl ggcaInit( int iDeviceNum )
 	}
 	else
 	{
-		//for(int i =0;i< g_maxDeviceNum;i++ )
-		//{	
-		//	int devType=EloamGlobal_GetEloamType(1,i);
-		//	if(devType == 0 &&)
-		//	{
-		//		index = i;
-		//	}	
-		//	if(devType == 1)
-		//	{
-		//		index = i;
-		//	}	
-		//}
-		HELOAMDEVICE hDev = EloamGlobal_CreateDevice(1,iDeviceNum);
-
+		int deveIndex=GetDeveloperDevId(iDeviceNum);
+		int computerIndex=-1;
+		for(int i =0;i<g_deviceCnt;i++ )
+		{	
+			int devType=EloamGlobal_GetEloamType(1,i);
+			if(devType-1 == deveIndex)//设备类型=设备开发者定义序号+1
+			{
+				computerIndex = i;
+			}	
+		}
+		if (computerIndex<0)
+		{
+			return iRet;
+		}
+		HELOAMDEVICE hDev = EloamGlobal_CreateDevice(1,computerIndex);
 		if (NULL!=hDev)
 		{
 			DevInfo devInfo;
 			devInfo.hDev=hDev;	
 			devInfo.displayName = EloamDevice_GetDisplayName(hDev);//获取设备显示名称
 			devInfo.friendlyName = EloamDevice_GetFriendlyName(hDev);//获取友好名称
-			devInfo.devType=EloamGlobal_GetEloamType(1,iDeviceNum);//获取设备类型
-			devInfo.devIndex=iDeviceNum;//设备索引
+			devInfo.devType=EloamGlobal_GetEloamType(1,deveIndex);//获取设备类型
+			devInfo.developerIndex=deveIndex;//开发者定义的设备索引
+			devInfo.userIndex=iDeviceNum;//用户定义的设备索引
 			LONG subtype = EloamDevice_GetSubtype(hDev);//获取子模式
 			GetSubtype(subtype,devInfo.subtypes);
 			if (!devInfo.subtypes.empty())
@@ -338,21 +337,18 @@ VOID ELOAMAPI DevChangeCallback( LONG type, LONG idx, LONG dbt, LPVOID userData 
 	}
 	if(1 == dbt)
 	{//设备到达
-		if (g_maxDeviceNum<idx)
-		{
-			g_maxDeviceNum=idx;
-		}
+		g_deviceCnt++;
 	}
 	else if(2 == dbt)
 	{//设备丢失
-		std::vector<int> devIndexs;
+		std::vector<int> userIndexs;
 		for (int i=0;i<g_cameras.size();i++)
 		{
-			devIndexs.push_back(g_cameras[i].devIndex);
+			userIndexs.push_back(g_cameras[i].userIndex);
 		}
-		for (int i=0;i<devIndexs.size();i++)
+		for (int i=0;i<userIndexs.size();i++)
 		{
-			ggcaRelease(devIndexs[i]);
+			ggcaRelease(userIndexs[i]);
 		}
 	}
 }
@@ -388,7 +384,7 @@ DevInfo * GetDevInfo( int iDeviceNum,int &index )
 	for (int i=0;i<g_cameras.size();i++)
 	{
 		DevInfo devInfo=g_cameras[i];
-		if (devInfo.devIndex==iDeviceNum)
+		if (devInfo.userIndex==iDeviceNum)
 		{
 			pDevInfo=&g_cameras[i];
 			index=i;
@@ -396,4 +392,22 @@ DevInfo * GetDevInfo( int iDeviceNum,int &index )
 		}
 	}
 	return pDevInfo;
+}
+
+int GetDeveloperDevId( int userIndex )
+{
+	int deveIndex=-1;//开发者定义的摄像头序号 0=主摄像头，1=副摄像头1，2=副摄像头2。默认-1,表示对应关系不存在
+	switch (userIndex)
+	{//当前用户定义摄像头序号与开发者定义序号的对应关系为:0-0、1-1、2-2。如果有不同的对应关系，修改case的参数即可。
+	case 0:
+		deveIndex=0;
+		break;
+	case 1:
+		deveIndex=1;
+		break;
+	case 2:
+		deveIndex=2;
+		break;
+	}
+	return deveIndex;
 }

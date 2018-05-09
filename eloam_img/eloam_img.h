@@ -23,7 +23,8 @@ struct DevInfo
 	BSTR displayName;				//设备显示名称
 	BSTR friendlyName;				//设备友好名称
 	int devType;					//设备类型 1=主摄像头 2、3=辅助摄像头
-	int devIndex;					//设备索引
+	int developerIndex;				//开发者定义的设备索引
+	int userIndex;					//用户定义的设备索引
 	std::vector<int> subtypes;		//支持的出图类型 0x01=YUY2,0x02=MJPG,0x03=UYVY,0x04=RGB24,0x05=H264
 	std::vector<EloamSize> sizes;	//支持的分辨率
 	int resIndex;					//选择的分辨率索引
@@ -36,7 +37,8 @@ struct DevInfo
 		displayName=NULL;
 		friendlyName=NULL;
 		devType=-1;
-		devIndex=-1;
+		developerIndex=-1;
+		userIndex=-1;
 		resIndex=-1;
 		channels=3;//默认彩色
 		viewWnd=NULL;
@@ -46,7 +48,7 @@ struct DevInfo
 //设备是否初始化
 bool g_isInit=false;
 //摄像头最大设备ID
-int g_maxDeviceNum=-1;
+int g_deviceCnt=0;
 //设备全局变量
 std::vector<DevInfo> g_cameras;
 
@@ -58,6 +60,9 @@ void GetSubtype(long subtype,std::vector<int>& subtypeIndex);
 
 //根据设备索引获取设备信息
 DevInfo *GetDevInfo(int iDeviceNum,int &index);
+
+//获取摄像头开发者索引
+int GetDeveloperDevId(int userIndex);
 
 /************************************************************************/
 /* 功能:
