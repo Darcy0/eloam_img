@@ -104,16 +104,14 @@ extern "C" CAMERADEV_API int _cdecl ggcaRelease( int iDeviceNum )
 extern "C" CAMERADEV_API int _cdecl ggcaSetResolution( int iDeviceNum, int iWidth, int iHeight, int iBPP )
 {
 	int iRet=-1;
-	if (1!=iBPP&&3!=iBPP)
-	{//1=8bitÍ¼Ïñ 3=24bitÍ¼Ïñ
-		return iRet;
-	}
+
 	int vecIndex=0;
 	DevInfo *pDevInfo=GetDevInfo(iDeviceNum,vecIndex);
 	if (NULL==pDevInfo)
 	{
 		return iRet;
 	}
+
 	bool isFindRes=false;
 	for (int i=0;i<pDevInfo->sizes.size();i++)
 	{
@@ -125,18 +123,22 @@ extern "C" CAMERADEV_API int _cdecl ggcaSetResolution( int iDeviceNum, int iWidt
 			break;
 		}
 	}
-	if (isFindRes)
+	if (!isFindRes)
 	{
-		pDevInfo->channels=iBPP;
-		iRet=0;
+		pDevInfo->resIndex=0;	
 	}
+	if (1!=iBPP&&3!=iBPP)
+	{//1=8bitÍ¼Ïñ 3=24bitÍ¼Ïñ
+		iBPP=3;
+	}
+	pDevInfo->channels=iBPP;
+	iRet=0;
 	return iRet;
 }
 
 extern "C" CAMERADEV_API int _cdecl ggcaSetPrvWnd( int iDeviceNum,HWND hControl )
 {
 	int iRet=-1;
-
 
 	int vecIndex=0;
 	DevInfo *pDevInfo=GetDevInfo(iDeviceNum,vecIndex);
@@ -145,14 +147,13 @@ extern "C" CAMERADEV_API int _cdecl ggcaSetPrvWnd( int iDeviceNum,HWND hControl 
 		EloamView_Release(pDevInfo->viewWnd);
 		pDevInfo->viewWnd=NULL;
 	}
-		HELOAMVIEW hView = EloamGlobal_CreateView(hControl,NULL,0);
+	HELOAMVIEW hView = EloamGlobal_CreateView(hControl,NULL,0);
 	if (!hView)
 	{
 		return iRet;
 	}
 	if (pDevInfo)
 	{
-
 		pDevInfo->viewWnd=hView;
 		EloamView_SetText(pDevInfo->viewWnd, L"µÈ´ý´ò¿ªÊÓÆµÖÐ...", RGB(255, 255, 255));
 		iRet=0;
