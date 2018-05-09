@@ -29,6 +29,7 @@ struct DevInfo
 	std::vector<EloamSize> sizes;	//支持的分辨率
 	int resIndex;					//选择的分辨率索引
 	int channels;					//图像通道数
+	BOOL isDeskew;					//是否纠偏裁边
 	HELOAMVIEW viewWnd;				//预览窗口
 	HELOAMVIDEO video;				//视频对象
 	DevInfo()
@@ -41,6 +42,7 @@ struct DevInfo
 		userIndex=-1;
 		resIndex=-1;
 		channels=3;//默认彩色
+		isDeskew=FALSE;
 		viewWnd=NULL;
 		video=NULL;
 	}
@@ -54,7 +56,8 @@ std::vector<DevInfo> g_cameras;
 
 //设备拔插回调函数
 VOID ELOAMAPI DevChangeCallback(LONG type, LONG idx, LONG dbt, LPVOID userData);
-
+//视频到达回调
+VOID ELOAMAPI AttachCallback(HELOAMVIDEO video, LONG videoId, HELOAMVIEW view, LONG viewId, LPVOID userData);
 //获取支持的出图格式
 void GetSubtype(long subtype,std::vector<int>& subtypeIndex);
 

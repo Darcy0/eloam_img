@@ -244,7 +244,7 @@ extern "C" CAMERADEV_API int _cdecl ggcaStart( int iDeviceNum,int iType )
 	}
 
 	pDevInfo->video=video;
-	if (EloamView_SelectVideo(pDevInfo->viewWnd, pDevInfo->video, NULL, NULL))
+	if (EloamView_SelectVideo(pDevInfo->viewWnd, pDevInfo->video, AttachCallback, pDevInfo))
 	{
 		EloamView_SetText(pDevInfo->viewWnd, L"打开视频中，请等待...", RGB(255, 255, 255));
 		iRet=0;
@@ -394,8 +394,9 @@ extern "C" CAMERADEV_API int _cdecl ggcaSetDynamicClear( int iDeviceNum,BOOL dyn
 		g_logOut.StatusOut(Info,_T("(%s) 没有找到对应设备。iDeviceNum=%d  End. line:%d\r\n"),__FUNCTION__,iDeviceNum,__LINE__);
 		return iRet;
 	}
+	pDevInfo->isDeskew=dynamicClear;
 	if (!pDevInfo->video)
-	{
+	{	
 		g_logOut.StatusOut(Info,_T("(%s) 视频对象不存在。 End. line:%d\r\n"),__FUNCTION__,__LINE__);
 		return iRet;
 	}
@@ -449,6 +450,27 @@ VOID ELOAMAPI DevChangeCallback( LONG type, LONG idx, LONG dbt, LPVOID userData 
 	}
 
 	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+}
+
+VOID ELOAMAPI AttachCallback( HELOAMVIDEO video, LONG videoId, HELOAMVIEW view, LONG viewId, LPVOID userData )
+{
+	if (1!=videoId)
+	{//只在第一帧图像到达时处理
+		return;
+	}
+	DevInfo *pDevInfo=(DevInfo *)userData;
+	if (!pDevInfo)
+	{
+		return;
+	}
+	if (1==pDevInfo->channels)
+	{
+		EloamVideo_EnableGray(video);
+	}
+	if (TRUE==pDevInfo->isDeskew)
+	{
+		EloamVideo_EnableDeskew(video,0);
+	}
 }
 
 void GetSubtype( long subtype,std::vector<int>& subtypeIndex )
