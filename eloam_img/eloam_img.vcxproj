@@ -79,9 +79,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="eloam_img.h" />
+    <ClInclude Include="SAStatusLog.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="eloam_img.cpp" />
+    <ClCompile Include="SAStatusLog.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
