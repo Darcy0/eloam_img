@@ -60,12 +60,12 @@ VOID ELOAMAPI DevChangeCallback(LONG type, LONG idx, LONG dbt, LPVOID userData);
 VOID ELOAMAPI AttachCallback(HELOAMVIDEO video, LONG videoId, HELOAMVIEW view, LONG viewId, LPVOID userData);
 //获取支持的出图格式
 void GetSubtype(long subtype,std::vector<int>& subtypeIndex);
-
 //根据设备索引获取设备信息
 DevInfo *GetDevInfo(int iDeviceNum,int &index);
-
 //获取摄像头开发者索引
 int GetDeveloperDevId(int userIndex);
+//释放指定ID的设备资源
+int ReleaseDevResource(int userIndex);
 
 /************************************************************************/
 /* 功能:

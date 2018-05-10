@@ -17,6 +17,12 @@ extern "C" CAMERADEV_API int _cdecl ggcaInit( int iDeviceNum )
 		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("开始设备初始化..."),__LINE__);
 		g_deviceCnt=0;
 		EloamGlobal_InitDevs(DevChangeCallback,NULL);
+		if(g_deviceCnt<=0)
+		{
+			EloamGlobal_DeinitDevs();
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("设备初始化失败."),__LINE__);
+			return iRet;		
+		}		
 		g_isInit=true;
 		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("设备初始化完成."),__LINE__);
 	}
@@ -90,44 +96,22 @@ extern "C" CAMERADEV_API int _cdecl ggcaRelease( int iDeviceNum )
 {
 	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("Start..."),__LINE__);
 
-	int vecIndex=0;
-	DevInfo *pDevInfo=GetDevInfo(iDeviceNum,vecIndex);
-	if (NULL==pDevInfo)
+	int iRet=-1;
+	if (ReleaseDevResource(iDeviceNum)<0)
 	{
-		g_logOut.StatusOut(Info,_T("(%s) 没有找到对应设备。iDeviceNum=%d  End. line:%d\r\n"),__FUNCTION__,iDeviceNum,__LINE__);
-		return -1;
+		return iRet;
 	}
-	EloamGlobal_DestroyString(pDevInfo->displayName);
-	pDevInfo->displayName=NULL;
-	EloamGlobal_DestroyString(pDevInfo->friendlyName);
-	pDevInfo->friendlyName=NULL;
-	pDevInfo->subtypes.clear();
-	pDevInfo->sizes.clear();
-	if (NULL!=pDevInfo->video)
-	{//释放视频对象
-		EloamVideo_Release(pDevInfo->video);
-		pDevInfo->video=NULL;
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("视频对象已释放."),__LINE__);
-	}
-	if (NULL!=pDevInfo->viewWnd)
-	{
-		EloamView_Release(pDevInfo->viewWnd);
-		pDevInfo->viewWnd=NULL;
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("视频窗口对象已释放."),__LINE__);
-	}
-	EloamDevice_Release(pDevInfo->hDev);
-	g_cameras.erase(g_cameras.begin()+vecIndex);
-
 	if (g_cameras.empty())
 	{
 		EloamGlobal_DeinitDevs();
 		g_isInit=false;
 		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("设备列表为空,设备已进行反初始化."),__LINE__);
 	}
-
+	iRet=0;
+	
 	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
 
-	return 0;
+	return iRet;
 }
 
 extern "C" CAMERADEV_API int _cdecl ggcaSetResolution( int iDeviceNum, int iWidth, int iHeight, int iBPP )
@@ -328,8 +312,9 @@ extern "C" CAMERADEV_API char* _cdecl ggcaGetImage( int iDeviceNum , char *filen
 	}
 	if (iClearBK||iDeskew)
 	{//如果去边或纠偏
-		if (!EloamImage_Rectify(hEloamImg,0))
+		if (!EloamImage_Deskew(hEloamImg,0))
 		{
+			//g_logOut.StatusOut(Info,_T("(%s) XXXXXXXXXXXXXXXXXXXXXXXXX line:%d\r\n"),__FUNCTION__,__LINE__);
 			EloamImage_Release(hEloamImg);
 			hEloamImg=NULL;
 			g_logOut.StatusOut(Info,_T("(%s) 纠偏裁边失败. End. line:%d\r\n"),__FUNCTION__,__LINE__);
@@ -445,8 +430,9 @@ VOID ELOAMAPI DevChangeCallback( LONG type, LONG idx, LONG dbt, LPVOID userData 
 		}
 		for (int i=0;i<userIndexs.size();i++)
 		{
-			ggcaRelease(userIndexs[i]);
+			ReleaseDevResource(userIndexs[i]);
 		}
+		g_deviceCnt=0;
 	}
 
 	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
@@ -530,4 +516,43 @@ int GetDeveloperDevId( int userIndex )
 		break;
 	}
 	return deveIndex;
+}
+
+int ReleaseDevResource( int userIndex )
+{
+	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("Start..."),__LINE__);
+	int iRet=-1;
+
+	int vecIndex=0;
+	DevInfo *pDevInfo=GetDevInfo(userIndex,vecIndex);
+	if (NULL==pDevInfo)
+	{
+		g_logOut.StatusOut(Info,_T("(%s) 没有找到对应设备。iDeviceNum=%d  End. line:%d\r\n"),__FUNCTION__,userIndex,__LINE__);
+		return iRet;
+	}
+	EloamGlobal_DestroyString(pDevInfo->displayName);
+	pDevInfo->displayName=NULL;
+	EloamGlobal_DestroyString(pDevInfo->friendlyName);
+	pDevInfo->friendlyName=NULL;
+	pDevInfo->subtypes.clear();
+	pDevInfo->sizes.clear();
+	if (NULL!=pDevInfo->video)
+	{//释放视频对象
+		EloamVideo_Release(pDevInfo->video);
+		pDevInfo->video=NULL;
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("视频对象已释放."),__LINE__);
+	}
+	if (NULL!=pDevInfo->viewWnd)
+	{
+		EloamView_Release(pDevInfo->viewWnd);
+		pDevInfo->viewWnd=NULL;
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("视频窗口对象已释放."),__LINE__);
+	}
+	EloamDevice_Release(pDevInfo->hDev);
+	g_cameras.erase(g_cameras.begin()+vecIndex);
+	
+	iRet=0;
+	return iRet;
+
+	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
 }
