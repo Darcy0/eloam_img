@@ -2,7 +2,7 @@
 
 #include "afx.h"
 #include <vector>
-#include "include/eloamDll.h"
+#include "eloam.h"
 
 #define CAMERADEV_API  __declspec(dllexport)
 
@@ -53,7 +53,8 @@ bool g_isInit=false;
 int g_deviceCnt=0;
 //设备全局变量
 std::vector<DevInfo> g_cameras;
-
+//eloamDLL动态库句柄
+HINSTANCE g_eloamDll;
 //设备拔插回调函数
 VOID ELOAMAPI DevChangeCallback(LONG type, LONG idx, LONG dbt, LPVOID userData);
 //视频到达回调
@@ -66,7 +67,8 @@ DevInfo *GetDevInfo(int iDeviceNum,int &index);
 int GetDeveloperDevId(int userIndex);
 //释放指定ID的设备资源
 int ReleaseDevResource(int userIndex);
-
+//获取eloamDll.dll的函数指针
+void *GetFunctionPointer( const char* funName);
 /************************************************************************/
 /* 功能:
 /*		初始化摄像头

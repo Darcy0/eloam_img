@@ -78,6 +78,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="eloam.h" />
     <ClInclude Include="eloam_img.h" />
     <ClInclude Include="SAStatusLog.h" />
   </ItemGroup>

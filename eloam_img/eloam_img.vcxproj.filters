@@ -21,6 +21,9 @@
     <ClInclude Include="SAStatusLog.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="eloam.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="eloam_img.cpp">

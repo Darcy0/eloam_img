@@ -2,25 +2,43 @@
 #include "SAStatusLog.h"
 #include <afxdlgs.h>
 
-#pragma comment(lib,"lib/eloamDll.lib")
-
 //声明日志全局变量
 CSAStatusLog g_logOut(_T("eloam_dll"));
 
 extern "C" CAMERADEV_API int _cdecl ggcaInit( int iDeviceNum )
 {
 	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("Start..."),__LINE__);
-
 	int iRet=-1;
+	if (!g_eloamDll)
+	{//加载动态库
+		g_eloamDll=LoadLibrary(_T("eloamDll.dll"));
+		if (!g_eloamDll)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  End. line:%d\r\n"),__FUNCTION__,_T("eloamDll.dll加载失败."),__LINE__);
+			return iRet;
+		}
+	}
 	if (!g_isInit)
 	{//初始化设备
 		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("开始设备初始化..."),__LINE__);
 		g_deviceCnt=0;
-		EloamGlobal_InitDevs(DevChangeCallback,NULL);
+		pEloamGlobal_InitDevs pInitDevs=(pEloamGlobal_InitDevs)GetFunctionPointer(_T("EloamGlobal_InitDevs"));
+		if (NULL==pInitDevs)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return iRet;
+		}
+		pInitDevs(DevChangeCallback,NULL);
 		if(g_deviceCnt<=0)
 		{
-			EloamGlobal_DeinitDevs();
-			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("设备初始化失败."),__LINE__);
+			pEloamGlobal_DeinitDevs pDeinitDevs=(pEloamGlobal_DeinitDevs)GetFunctionPointer(_T("EloamGlobal_DeinitDevs"));
+			if (NULL==pDeinitDevs)
+			{
+				g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+				return iRet;
+			}
+			pDeinitDevs();
+			g_logOut.StatusOut(Info,_T("(%s) %s  End. line:%d\r\n"),__FUNCTION__,_T("设备初始化失败."),__LINE__);
 			return iRet;		
 		}		
 		g_isInit=true;
@@ -30,7 +48,7 @@ extern "C" CAMERADEV_API int _cdecl ggcaInit( int iDeviceNum )
 	DevInfo *pDevInfo=GetDevInfo(iDeviceNum,vecIndex);
 	if (pDevInfo)
 	{//该序号设备已初始化
-		g_logOut.StatusOut(Info,_T("(%s) 摄像头已初始化:iDeviceNum=%d  line:%d\r\n"),__FUNCTION__,iDeviceNum,__LINE__);
+		g_logOut.StatusOut(Info,_T("(%s) 摄像头已初始化:iDeviceNum=%d line:%d\r\n"),__FUNCTION__,iDeviceNum,__LINE__);
 		iRet=0;
 	}
 	else
@@ -40,7 +58,13 @@ extern "C" CAMERADEV_API int _cdecl ggcaInit( int iDeviceNum )
 		int computerIndex=-1;
 		for(int i =0;i<g_deviceCnt;i++ )
 		{	
-			int devType=EloamGlobal_GetEloamType(1,i);
+			pEloamGlobal_GetEloamType pGetEloamType=(pEloamGlobal_GetEloamType)GetFunctionPointer(_T("EloamGlobal_GetEloamType"));
+			if (NULL==pGetEloamType)
+			{
+				g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+				return iRet;
+			}
+			int devType=pGetEloamType(1,i);
 			if(devType-1 == deveIndex)//设备类型=设备开发者定义序号+1
 			{
 				computerIndex = i;
@@ -52,7 +76,14 @@ extern "C" CAMERADEV_API int _cdecl ggcaInit( int iDeviceNum )
 			return iRet;
 		}
 		g_logOut.StatusOut(Info,_T("(%s) 用户输入摄像头ID=iDeviceNum=%d->开发者定义摄像头ID=%d  line:%d\r\n"),__FUNCTION__,iDeviceNum,deveIndex,__LINE__);
-		HELOAMDEVICE hDev = EloamGlobal_CreateDevice(1,computerIndex);
+		
+		pEloamGlobal_CreateDevice pCreateDevice=(pEloamGlobal_CreateDevice)GetFunctionPointer(_T("EloamGlobal_CreateDevice"));
+		if (NULL==pCreateDevice)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return iRet;
+		}
+		HELOAMDEVICE hDev = pCreateDevice(1,computerIndex);
 		if (NULL==hDev)
 		{
 			g_logOut.StatusOut(Info,_T("(%s) 设备创建失败。摄像头初始化失败:iDeviceNum=%d  End. line:%d\r\n"),__FUNCTION__,iDeviceNum,__LINE__);
@@ -61,23 +92,66 @@ extern "C" CAMERADEV_API int _cdecl ggcaInit( int iDeviceNum )
 		else
 		{
 			DevInfo devInfo;
-			devInfo.hDev=hDev;	
-			devInfo.displayName = EloamDevice_GetDisplayName(hDev);//获取设备显示名称
-			devInfo.friendlyName = EloamDevice_GetFriendlyName(hDev);//获取友好名称
-			devInfo.devType=EloamGlobal_GetEloamType(1,deveIndex);//获取设备类型
+			devInfo.hDev=hDev;
+			pEloamDevice_GetDisplayName pGetDisplayName=(pEloamDevice_GetDisplayName)GetFunctionPointer(_T("EloamDevice_GetDisplayName"));
+			if (NULL==pGetDisplayName)
+			{
+				g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+				return iRet;
+			}
+			devInfo.displayName = pGetDisplayName(hDev);//获取设备显示名称
+			pEloamDevice_GetFriendlyName pGetFriendlyName=(pEloamDevice_GetFriendlyName)GetFunctionPointer(_T("EloamDevice_GetFriendlyName"));
+			if (NULL==pGetFriendlyName)
+			{
+				g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+				return iRet;
+			}
+			devInfo.friendlyName = pGetFriendlyName(hDev);//获取友好名称
+			pEloamGlobal_GetEloamType pGetEloamType=(pEloamGlobal_GetEloamType)GetFunctionPointer(_T("EloamGlobal_GetEloamType"));
+			if (NULL==pGetEloamType)
+			{
+				g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+				return iRet;
+			}
+			devInfo.devType=pGetEloamType(1,deveIndex);//获取设备类型
 			devInfo.developerIndex=deveIndex;//开发者定义的设备索引
 			devInfo.userIndex=iDeviceNum;//用户定义的设备索引
-			LONG subtype = EloamDevice_GetSubtype(hDev);//获取子模式
+			pEloamDevice_GetSubtype pGetSubtype=(pEloamDevice_GetSubtype)GetFunctionPointer(_T("EloamDevice_GetSubtype"));
+			if (NULL==pGetSubtype)
+			{
+				g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+				return iRet;
+			}
+			LONG subtype = pGetSubtype(hDev);//获取子模式
 			GetSubtype(subtype,devInfo.subtypes);
 			if (!devInfo.subtypes.empty())
 			{
 				int subtypeIndex=devInfo.subtypes[0];
-				int resCount = EloamDevice_GetResolutionCountEx(hDev, subtypeIndex);//获取分辨率个数
+				pEloamDevice_GetResolutionCountEx pGetResolutionCountEx=(pEloamDevice_GetResolutionCountEx)GetFunctionPointer(_T("EloamDevice_GetResolutionCountEx"));
+				if (NULL==pGetResolutionCountEx)
+				{
+					g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+					return iRet;
+				}
+				int resCount = pGetResolutionCountEx(hDev, subtypeIndex);//获取分辨率个数			
+				pEloamDevice_GetResolutionWidthEx pGetResolutionWidthEx=(pEloamDevice_GetResolutionWidthEx)GetFunctionPointer(_T("EloamDevice_GetResolutionWidthEx"));
+				if (NULL==pGetResolutionWidthEx)
+				{
+					g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+					return iRet;
+				}
+				pEloamDevice_GetResolutionHeightEx pGetResolutionHeightEx=(pEloamDevice_GetResolutionHeightEx)GetFunctionPointer(_T("EloamDevice_GetResolutionHeightEx"));
+				if (NULL==pGetResolutionHeightEx)
+				{
+					g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+					return iRet;
+				}
 				for (int i = 0; i < resCount; ++i)
 				{
 					EloamSize eloamSize;
-					eloamSize.width = EloamDevice_GetResolutionWidthEx(hDev, subtypeIndex, i);
-					eloamSize.height = EloamDevice_GetResolutionHeightEx(hDev, subtypeIndex, i);
+
+					eloamSize.width = pGetResolutionWidthEx(hDev, subtypeIndex, i);
+					eloamSize.height = pGetResolutionHeightEx(hDev, subtypeIndex, i);
 					devInfo.sizes.push_back(eloamSize);
 				}
 			}
@@ -103,7 +177,13 @@ extern "C" CAMERADEV_API int _cdecl ggcaRelease( int iDeviceNum )
 	}
 	if (g_cameras.empty())
 	{
-		EloamGlobal_DeinitDevs();
+		pEloamGlobal_DeinitDevs pDeinitDevs=(pEloamGlobal_DeinitDevs)GetFunctionPointer(_T("EloamGlobal_DeinitDevs"));
+		if (NULL==pDeinitDevs)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return iRet;
+		}
+		pDeinitDevs();
 		g_isInit=false;
 		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("设备列表为空,设备已进行反初始化."),__LINE__);
 	}
@@ -174,17 +254,35 @@ extern "C" CAMERADEV_API int _cdecl ggcaSetPrvWnd( int iDeviceNum,HWND hControl 
 
 	if (pDevInfo->viewWnd)
 	{
-		EloamView_Release(pDevInfo->viewWnd);
+		pEloamView_Release pViewRelease=(pEloamView_Release)GetFunctionPointer(_T("EloamView_Release"));
+		if (NULL==pViewRelease)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return iRet;
+		}
+		pViewRelease(pDevInfo->viewWnd);
 		pDevInfo->viewWnd=NULL;
 	}
-	HELOAMVIEW hView = EloamGlobal_CreateView(hControl,NULL,0);
+	pEloamGlobal_CreateView pCreateView=(pEloamGlobal_CreateView)GetFunctionPointer(_T("EloamGlobal_CreateView"));
+	if (NULL==pCreateView)
+	{
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+		return iRet;
+	}
+	HELOAMVIEW hView = pCreateView(hControl,NULL,0);
 	if (!hView)
 	{
 		g_logOut.StatusOut(Info,_T("(%s) 图像显示窗口对象创建失败. End. line:%d\r\n"),__FUNCTION__,__LINE__);
 		return iRet;
 	}
 	pDevInfo->viewWnd=hView;
-	EloamView_SetText(pDevInfo->viewWnd, L"等待打开视频中...", RGB(255, 255, 255));
+	pEloamView_SetText pViewSetText=(pEloamView_SetText)GetFunctionPointer(_T("EloamView_SetText"));
+	if (NULL==pViewSetText)
+	{
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+		return iRet;
+	}
+	pViewSetText(pDevInfo->viewWnd, L"等待打开视频中...", RGB(255, 255, 255));
 	iRet=0;
 
 	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
@@ -217,10 +315,22 @@ extern "C" CAMERADEV_API int _cdecl ggcaStart( int iDeviceNum,int iType )
 	}	
 	if (NULL!=pDevInfo->video)
 	{//释放视频对象
-		EloamVideo_Release(pDevInfo->video);
+		pEloamVideo_Release pVideoRelease=(pEloamVideo_Release)GetFunctionPointer(_T("EloamVideo_Release"));
+		if (NULL==pVideoRelease)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return iRet;
+		}
+		pVideoRelease(pDevInfo->video);
 		pDevInfo->video=NULL;
 	}
-	HELOAMVIDEO video = EloamDevice_CreateVideo(pDevInfo->hDev, pDevInfo->resIndex, pDevInfo->subtypes[0], NULL, NULL, NULL, NULL);	
+	pEloamDevice_CreateVideo pCreateVideo=(pEloamDevice_CreateVideo)GetFunctionPointer(_T("EloamDevice_CreateVideo"));
+	if (NULL==pCreateVideo)
+	{
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+		return iRet;
+	}
+	HELOAMVIDEO video = pCreateVideo(pDevInfo->hDev, pDevInfo->resIndex, pDevInfo->subtypes[0], NULL, NULL, NULL, NULL,0,2);	
 	if (!video)
 	{
 		g_logOut.StatusOut(Info,_T("(%s) 视频对象创建失败. End. line:%d\r\n"),__FUNCTION__,__LINE__);
@@ -228,9 +338,21 @@ extern "C" CAMERADEV_API int _cdecl ggcaStart( int iDeviceNum,int iType )
 	}
 
 	pDevInfo->video=video;
-	if (EloamView_SelectVideo(pDevInfo->viewWnd, pDevInfo->video, AttachCallback, pDevInfo))
+	pEloamView_SelectVideo pViewSelectVideo=(pEloamView_SelectVideo)GetFunctionPointer(_T("EloamView_SelectVideo"));
+	if (NULL==pViewSelectVideo)
 	{
-		EloamView_SetText(pDevInfo->viewWnd, L"打开视频中，请等待...", RGB(255, 255, 255));
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+		return iRet;
+	}
+	if (pViewSelectVideo(pDevInfo->viewWnd, pDevInfo->video, AttachCallback, pDevInfo))
+	{
+		pEloamView_SetText pViewSetText=(pEloamView_SetText)GetFunctionPointer(_T("EloamView_SetText"));
+		if (NULL==pViewSetText)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return iRet;
+		}
+		pViewSetText(pDevInfo->viewWnd, L"打开视频中，请等待...", RGB(255, 255, 255));
 		iRet=0;
 	} 
 
@@ -257,10 +379,22 @@ extern "C" CAMERADEV_API int _cdecl ggcaStop( int iDeviceNum,int iType )
 	}
 	if (NULL!=pDevInfo->video&&NULL!=pDevInfo->viewWnd)
 	{
-		EloamVideo_Release(pDevInfo->video);//释放视频对象
+		pEloamVideo_Release pVideoRelease=(pEloamVideo_Release)GetFunctionPointer(_T("EloamVideo_Release"));
+		if (NULL==pVideoRelease)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return iRet;
+		}
+		pVideoRelease(pDevInfo->video);//释放视频对象
 		pDevInfo->video = NULL;
 		g_logOut.StatusOut(Info,_T("(%s) 已释放视频对象 line:%d\r\n"),__FUNCTION__,__LINE__);
-		EloamView_SetText(pDevInfo->viewWnd, L"无信号输入...", 0);
+		pEloamView_SetText pViewSetText=(pEloamView_SetText)GetFunctionPointer(_T("EloamView_SetText"));
+		if (NULL==pViewSetText)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return iRet;
+		}
+		pViewSetText(pDevInfo->viewWnd, L"无信号输入...", 0);
 		iRet=0;
 	}
 
@@ -304,18 +438,36 @@ extern "C" CAMERADEV_API char* _cdecl ggcaGetImage( int iDeviceNum , char *filen
 			return NULL;
 		}
 	}
-	HELOAMIMAGE hEloamImg = EloamVideo_CreateImage(pDevInfo->video, 0, pDevInfo->viewWnd);
+	pEloamVideo_CreateImage pCreateImage=(pEloamVideo_CreateImage)GetFunctionPointer(_T("EloamVideo_CreateImage"));
+	if (NULL==pCreateImage)
+	{
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+		return NULL;
+	}
+	HELOAMIMAGE hEloamImg = pCreateImage(pDevInfo->video, 0, pDevInfo->viewWnd);
 	if (!hEloamImg)
 	{
 		g_logOut.StatusOut(Info,_T("(%s) 图像对象创建失败. End. line:%d\r\n"),__FUNCTION__,__LINE__);
 		return NULL;
 	}
+	pEloamImage_Release pImageRelease=(pEloamImage_Release)GetFunctionPointer(_T("EloamImage_Release"));
+	if (NULL==pImageRelease)
+	{
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+		return NULL;
+	}
 	if (iClearBK||iDeskew)
 	{//如果去边或纠偏
-		if (!EloamImage_Deskew(hEloamImg,0))
+		pEloamImage_Deskew pImageDeskew=(pEloamImage_Deskew)GetFunctionPointer(_T("EloamImage_Deskew"));
+		if (NULL==pImageDeskew)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return NULL;
+		}
+		if (!pImageDeskew(hEloamImg,0))
 		{
 			//g_logOut.StatusOut(Info,_T("(%s) XXXXXXXXXXXXXXXXXXXXXXXXX line:%d\r\n"),__FUNCTION__,__LINE__);
-			EloamImage_Release(hEloamImg);
+			pImageRelease(hEloamImg);
 			hEloamImg=NULL;
 			g_logOut.StatusOut(Info,_T("(%s) 纠偏裁边失败. End. line:%d\r\n"),__FUNCTION__,__LINE__);
 			return NULL;
@@ -325,16 +477,28 @@ extern "C" CAMERADEV_API char* _cdecl ggcaGetImage( int iDeviceNum , char *filen
 	BOOL isSuccess=FALSE;
 	if (1==colorType||2==colorType)
 	{//黑白
-		isSuccess=EloamImage_AdaptiveThreshold(hEloamImg,30);
+		pEloamImage_AdaptiveThreshold pAdaptiveThreshold=(pEloamImage_AdaptiveThreshold)GetFunctionPointer(_T("EloamImage_AdaptiveThreshold"));
+		if (NULL==pAdaptiveThreshold)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return NULL;
+		}
+		isSuccess=pAdaptiveThreshold(hEloamImg,30);
 		//isSuccess=EloamImage_ToGray(hEloamImg);
 	}
 	else
 	{//彩色
-		isSuccess=EloamImage_ToColor(hEloamImg);
+		pEloamImage_ToColor pToColor=(pEloamImage_ToColor)GetFunctionPointer(_T("EloamImage_ToColor"));
+		if (NULL==pToColor)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return NULL;
+		}
+		isSuccess=pToColor(hEloamImg);
 	}
 	if (!isSuccess)
 	{
-		EloamImage_Release(hEloamImg);
+		pImageRelease(hEloamImg);
 		hEloamImg=NULL;
 		g_logOut.StatusOut(Info,_T("(%s) 生成指定颜色图片失败. End. line:%d\r\n"),__FUNCTION__,__LINE__);
 		return NULL;
@@ -344,9 +508,15 @@ extern "C" CAMERADEV_API char* _cdecl ggcaGetImage( int iDeviceNum , char *filen
 	{
 		iRotateType=0;
 	}
-	if (!EloamImage_Rotate(hEloamImg,360-iRotateType*90,RGB(192,192,192),1))
+	pEloamImage_Rotate pImageRotate=(pEloamImage_Rotate)GetFunctionPointer(_T("EloamImage_Rotate"));
+	if (NULL==pImageRotate)
 	{
-		EloamImage_Release(hEloamImg);
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+		return NULL;
+	}
+	if (!pImageRotate(hEloamImg,360-iRotateType*90,RGB(192,192,192),1))
+	{
+		pImageRelease(hEloamImg);
 		hEloamImg=NULL;
 		g_logOut.StatusOut(Info,_T("(%s) 图片旋转失败。 End. line:%d\r\n"),__FUNCTION__,__LINE__);
 		return NULL;
@@ -356,7 +526,13 @@ extern "C" CAMERADEV_API char* _cdecl ggcaGetImage( int iDeviceNum , char *filen
 	jpgCompress=jpgCompress<0?0:jpgCompress;
 	int imgQuality=0x0800>>(int(jpgCompress/20));
 	CComBSTR bstrFilename = filename;
-	if (!EloamImage_Save(hEloamImg, bstrFilename, imgQuality))
+	pEloamImage_Save pImageSave=(pEloamImage_Save)GetFunctionPointer(_T("EloamImage_Save"));
+	if (NULL==pImageRotate)
+	{
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+		return NULL;
+	}
+	if (!pImageSave(hEloamImg, bstrFilename, imgQuality))
 	{
 		g_logOut.StatusOut(Info,_T("(%s) 图片保存失败。 End. line:%d\r\n"),__FUNCTION__,__LINE__);
 		return NULL;
@@ -388,11 +564,23 @@ extern "C" CAMERADEV_API int _cdecl ggcaSetDynamicClear( int iDeviceNum,BOOL dyn
 	BOOL isSuccess=FALSE;
 	if (dynamicClear)
 	{
-		isSuccess=EloamVideo_EnableDeskew(pDevInfo->video,0);
+		pEloamVideo_EnableDeskew pVideoEnableDeskew=(pEloamVideo_EnableDeskew)GetFunctionPointer(_T("EloamVideo_EnableDeskew"));
+		if (NULL==pVideoEnableDeskew)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return NULL;
+		}
+		isSuccess=pVideoEnableDeskew(pDevInfo->video,0);
 	}
 	else
 	{
-		isSuccess=EloamVideo_DisableDeskew(pDevInfo->video);
+		pEloamVideo_DisableDeskew pVideoDisableDeskew=(pEloamVideo_DisableDeskew)GetFunctionPointer(_T("EloamVideo_DisableDeskew"));
+		if (NULL==pVideoDisableDeskew)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return NULL;
+		}
+		isSuccess=pVideoDisableDeskew(pDevInfo->video);
 	}
 	if (isSuccess)
 	{
@@ -451,11 +639,23 @@ VOID ELOAMAPI AttachCallback( HELOAMVIDEO video, LONG videoId, HELOAMVIEW view, 
 	}
 	if (1==pDevInfo->channels)
 	{
-		EloamVideo_EnableGray(video);
+		pEloamVideo_EnableGray pVideoEnableGray=(pEloamVideo_EnableGray)GetFunctionPointer(_T("EloamVideo_EnableGray"));
+		if (NULL==pVideoEnableGray)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return;
+		}
+		pVideoEnableGray(video);
 	}
 	if (TRUE==pDevInfo->isDeskew)
 	{
-		EloamVideo_EnableDeskew(video,0);
+		pEloamVideo_EnableDeskew pVideoEnableDeskew=(pEloamVideo_EnableDeskew)GetFunctionPointer(_T("EloamVideo_EnableDeskew"));
+		if (NULL==pVideoEnableDeskew)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return;
+		}
+		pVideoEnableDeskew(video,0);
 	}
 }
 
@@ -530,29 +730,79 @@ int ReleaseDevResource( int userIndex )
 		g_logOut.StatusOut(Info,_T("(%s) 没有找到对应设备。iDeviceNum=%d  End. line:%d\r\n"),__FUNCTION__,userIndex,__LINE__);
 		return iRet;
 	}
-	EloamGlobal_DestroyString(pDevInfo->displayName);
+	pEloamGlobal_DestroyString pDestroyString=(pEloamGlobal_DestroyString)GetFunctionPointer(_T("EloamGlobal_DestroyString"));
+	if (NULL==pDestroyString)
+	{
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+		return iRet;
+	}
+	pDestroyString(pDevInfo->displayName);
 	pDevInfo->displayName=NULL;
-	EloamGlobal_DestroyString(pDevInfo->friendlyName);
+	pDestroyString(pDevInfo->friendlyName);
 	pDevInfo->friendlyName=NULL;
 	pDevInfo->subtypes.clear();
 	pDevInfo->sizes.clear();
 	if (NULL!=pDevInfo->video)
 	{//释放视频对象
-		EloamVideo_Release(pDevInfo->video);
+		pEloamVideo_Release pVideoRelease=(pEloamVideo_Release)GetFunctionPointer(_T("EloamVideo_Release"));
+		if (NULL==pDestroyString)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return iRet;
+		}
+		pVideoRelease(pDevInfo->video);
 		pDevInfo->video=NULL;
 		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("视频对象已释放."),__LINE__);
 	}
 	if (NULL!=pDevInfo->viewWnd)
 	{
-		EloamView_Release(pDevInfo->viewWnd);
+		pEloamView_Release pViewRelease=(pEloamView_Release)GetFunctionPointer(_T("EloamView_Release"));
+		if (NULL==pDestroyString)
+		{
+			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+			return iRet;
+		}
+		pViewRelease(pDevInfo->viewWnd);
 		pDevInfo->viewWnd=NULL;
 		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("视频窗口对象已释放."),__LINE__);
 	}
-	EloamDevice_Release(pDevInfo->hDev);
+	pEloamDevice_Release pDeviceRelease=(pEloamDevice_Release)GetFunctionPointer(_T("EloamDevice_Release"));
+	if (NULL==pDeviceRelease)
+	{
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+		return iRet;
+	}
+	pDeviceRelease(pDevInfo->hDev);
 	g_cameras.erase(g_cameras.begin()+vecIndex);
 	
 	iRet=0;
 	return iRet;
 
 	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+}
+
+void *GetFunctionPointer( const char* funName )
+{
+	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("Start..."),__LINE__);
+	if (NULL==funName)
+	{
+		g_logOut.StatusOut(Info,_T("(%s) %s End. line:%d\r\n"),__FUNCTION__,_T("传入函数名为空."),__LINE__);
+		return NULL;
+	}
+	if (NULL==g_eloamDll)
+	{
+		g_logOut.StatusOut(Error,_T("(%s) %s line:%d\r\n"),__FUNCTION__,_T("eloamDll.dll动态库加载未加载. End."),__LINE__);
+		return NULL;
+	}
+	void* pFun=(void *)GetProcAddress(g_eloamDll,funName);
+	if (NULL==pFun)
+	{//函数指针获取失败
+		g_logOut.StatusOut(Error,_T("(%s) 函数%s加载失败 line:%d\r\n"),__FUNCTION__,funName,__LINE__);
+	}
+	else
+	{//函数指针获取成功
+		g_logOut.StatusOut(Info,_T("(%s) 函数%s加载成功 line:%d\r\n"),__FUNCTION__,funName,__LINE__);
+	}
+	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("End."),__LINE__);
+	return pFun;
 }
