@@ -47,6 +47,66 @@ struct DevInfo
 		video=NULL;
 	}
 };
+
+//设备初始化函数指针
+pEloamGlobal_InitDevs g_pInitDevs=NULL;
+//设备反初始化函数指针
+pEloamGlobal_DeinitDevs g_pDeinitDevs=NULL;
+//获取设备个数
+pEloamGlobal_GetDevCount g_pGetDevCount=NULL;
+//获取设备类型函数指针
+pEloamGlobal_GetEloamType g_pGetEloamType=NULL;
+//创建设备函数指针
+pEloamGlobal_CreateDevice g_pCreateDevice=NULL;
+//释放设备函数指针
+pEloamDevice_Release g_pDeviceRelease=NULL;
+//获取显示名称函数指针
+pEloamDevice_GetDisplayName g_pGetDisplayName=NULL;
+//获取友好名称函数指针
+pEloamDevice_GetFriendlyName g_pGetFriendlyName=NULL;
+//释放文字函数指针
+pEloamGlobal_DestroyString g_pDestroyString=NULL;
+//获取出图格式函数指针
+pEloamDevice_GetSubtype g_pGetSubtype=NULL;
+//获取分辨率个数函数指针
+pEloamDevice_GetResolutionCountEx g_pGetResolutionCountEx=NULL;
+//获取分辨率宽度函数指针
+pEloamDevice_GetResolutionWidthEx g_pGetResolutionWidthEx=NULL;
+//获取分辨率高度函数指针
+pEloamDevice_GetResolutionHeightEx g_pGetResolutionHeightEx=NULL;
+//创建视频窗口对象函数指针
+pEloamGlobal_CreateView g_pCreateView=NULL;
+//释放视频窗口对象函数指针
+pEloamView_Release g_pViewRelease=NULL;
+//视频窗口设置显示文字函数指针
+pEloamView_SetText g_pViewSetText=NULL;
+//创建视频函数指针
+pEloamDevice_CreateVideo g_pCreateVideo=NULL;
+//视频对象释放函数指针
+pEloamVideo_Release g_pVideoRelease=NULL;
+//将视频显示于窗口对象函数指针
+pEloamView_SelectVideo g_pViewSelectVideo=NULL;
+//创建图像函数指针
+pEloamVideo_CreateImage g_pCreateImage=NULL;
+//释放图像函数指针
+pEloamImage_Release g_pImageRelease=NULL;
+//纠偏去边函数指针
+pEloamImage_Deskew g_pImageDeskew=NULL;
+//自适应二值化函数指针
+pEloamImage_AdaptiveThreshold g_pAdaptiveThreshold=NULL;
+//图片彩色话函数指针
+pEloamImage_ToColor g_pImageToColor=NULL;
+//图片旋转函数指针
+pEloamImage_Rotate g_pImageRotate=NULL;
+//图片保存函数指针
+pEloamImage_Save g_pImageSave=NULL;
+//视频纠偏裁边函数指针
+pEloamVideo_EnableDeskew g_pVideoEnableDeskew=NULL;
+//取消视频纠偏裁边函数指针
+pEloamVideo_DisableDeskew g_pVideoDisableDeskew=NULL;
+//视频灰度化函数指针
+pEloamVideo_EnableGray g_pVideoEnableGray=NULL;
+
 //设备是否初始化
 bool g_isInit=false;
 //摄像头最大设备ID
@@ -59,6 +119,10 @@ HINSTANCE g_eloamDll;
 VOID ELOAMAPI DevChangeCallback(LONG type, LONG idx, LONG dbt, LPVOID userData);
 //视频到达回调
 VOID ELOAMAPI AttachCallback(HELOAMVIDEO video, LONG videoId, HELOAMVIEW view, LONG viewId, LPVOID userData);
+//加载动态库模块
+int loadDllModule();
+//加载用到的函数
+int LoadDllFunction();
 //获取支持的出图格式
 void GetSubtype(long subtype,std::vector<int>& subtypeIndex);
 //根据设备索引获取设备信息
@@ -67,6 +131,8 @@ DevInfo *GetDevInfo(int iDeviceNum,int &index);
 int GetDeveloperDevId(int userIndex);
 //释放指定ID的设备资源
 int ReleaseDevResource(int userIndex);
+//设置环境变量
+BOOL SetPathEnvVar(const char* var);
 //获取eloamDll.dll的函数指针
 void *GetFunctionPointer( const char* funName);
 /************************************************************************/
