@@ -81,6 +81,7 @@
     <ClInclude Include="eloam.h" />
     <ClInclude Include="eloam_img.h" />
     <ClInclude Include="SAStatusLog.h" />
+    <ClInclude Include="ZZImage_def.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="eloam_img.cpp" />
