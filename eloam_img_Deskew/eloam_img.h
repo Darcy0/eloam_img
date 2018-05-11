@@ -3,8 +3,6 @@
 #include "afx.h"
 #include <vector>
 #include "eloam.h"
-#include "./include/ZZImage.h"
-#include "ZZImage_def.h"
 
 #define CAMERADEV_API  __declspec(dllexport)
 
@@ -112,26 +110,6 @@ pEloamVideo_DisableDeskew g_pVideoDisableDeskew=NULL;
 //视频灰度化函数指针
 pEloamVideo_EnableGray g_pVideoEnableGray=NULL;
 
-//!ZZBase.dll函数函数指针
-//纠偏裁边初始化函数指针
-pZZInitSdk g_ZZInitSdk=NULL;
-//纠偏裁边下载图片函数指针
-pZZLoadImage g_ZZLoadImage=NULL;
-//纠偏裁边获取物体区域坐标函数指针
-pZZGetImageObjectRegionPos g_ZZGetImageObjectRegionPos=NULL;
-//纠偏裁边从区域坐标信息提取区域信息函数指针
-pZZGetImageRegionInfo g_ZZGetImageRegionInfo=NULL;
-//纠偏裁边创建图像函数指针
-pZZCreateImage g_ZZCreateImage=NULL;
-//纠偏裁边分离物体函数指针
-pZZSplitImageRegion g_ZZSplitImageRegion=NULL;
-//纠偏裁边保存图片函数指针
-pZZSaveImage g_ZZSaveImage=NULL;
-//纠偏裁边释放图片函数指针
-pZZDestroyImage g_ZZDestroyImage=NULL;
-//纠偏裁边反初始化函数指针
-pZZDeinitSdk g_ZZDeinitSdk=NULL;
-
 //设备是否初始化
 bool g_isInit=false;
 //动态库函数是否加载
@@ -142,9 +120,6 @@ int g_deviceCnt=0;
 std::vector<DevInfo> g_cameras;
 //eloamDLL动态库句柄
 HINSTANCE g_eloamDll=NULL;
-//ZZBase动态库句柄
-HINSTANCE g_ZZBaseDll=NULL;
-
 //设备拔插回调函数
 VOID ELOAMAPI DevChangeCallback(LONG type, LONG idx, LONG dbt, LPVOID userData);
 //视频到达回调
@@ -156,7 +131,7 @@ int LoadDllFunction();
 //设置当前进程环境变量
 int SetCurrentEnvPath();
 //获取动态库函数指针的函数指针
-void *GetFunctionPointer(  HINSTANCE module, const char* funName );
+void *GetFunctionPointer( HINSTANCE module, const char* funName);
 //获取支持的出图格式
 void GetSubtype(long subtype,std::vector<int>& subtypeIndex);
 //根据设备索引获取设备信息
@@ -165,9 +140,6 @@ DevInfo *GetDevInfo(int iDeviceNum,int &index);
 int GetDeveloperDevId(int userIndex);
 //释放指定ID的设备资源
 int ReleaseDevResource(int userIndex);
-//图片纠偏裁边并保存
-BOOL ImageDeskew(HELOAMIMAGE hEloamImg,const char* saveFileName);
-
 
 /************************************************************************/
 /* 功能:

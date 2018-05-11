@@ -1,8 +1,6 @@
 #include "eloam_img.h"
 #include "SAStatusLog.h"
 #include <afxdlgs.h>
-#include "atlbase.h"
-
 //声明日志全局变量
 CSAStatusLog g_logOut(_T("eloam_dll"));
 
@@ -13,7 +11,7 @@ extern "C" CAMERADEV_API int _cdecl ggcaInit( int iDeviceNum )
 	//加载动态库模块、函数
 	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("开始加载动态库模块..."),__LINE__);
 	int loadDllStatus=loadDllModule();
-	if (0x03==loadDllStatus||0x04==loadDllStatus)
+	if (loadDllStatus>=0)
 	{//动态库模块加载成功
 		if (!g_isLoadDllFun)
 		{
@@ -32,6 +30,7 @@ extern "C" CAMERADEV_API int _cdecl ggcaInit( int iDeviceNum )
 		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("动态库模块加载失败."),__LINE__);
 		return iRet;
 	}
+
 	if (!g_isInit)
 	{//初始化设备
 		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("开始设备初始化..."),__LINE__);
@@ -316,18 +315,11 @@ extern "C" CAMERADEV_API char* _cdecl ggcaGetImage( int iDeviceNum , char *filen
 
 	if (iClearBK||iDeskew)
 	{//如果去边或纠偏
-		if (!ImageDeskew(hEloamImg,filename))
+		if (!g_pImageDeskew(hEloamImg,0))
 		{
 			g_pImageRelease(hEloamImg);
 			hEloamImg=NULL;
 			g_logOut.StatusOut(Info,_T("(%s) 纠偏裁边失败.  line:%d\r\n"),__FUNCTION__,__LINE__);
-			return NULL;
-		}
-		g_pImageRelease(hEloamImg);
-		hEloamImg=g_CreateImageFromFile(bstrFilename,0);
-		if (NULL==hEloamImg)
-		{
-			g_logOut.StatusOut(Info,_T("(%s) 获取纠偏裁边图片失败.  line:%d\r\n"),__FUNCTION__,__LINE__);
 			return NULL;
 		}
 	}
@@ -460,48 +452,26 @@ VOID ELOAMAPI AttachCallback( HELOAMVIDEO video, LONG videoId, HELOAMVIEW view, 
 }
 
 int loadDllModule()
-{//0:动态库加载失败 1=eloamDll.dll加载成功 2=ZZBase.dll加载成功 3=eloamDll.dll、ZZBase.dll加载成功 4=两者已加载
+{//-1:动态库加载失败 0=eloamDll.dll加载成功 1=eloamDll.dll已加载
 	SetCurrentEnvPath();//设置环境变量
-	if (g_eloamDll!=NULL&&g_ZZBaseDll!=NULL)
-	{
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("eloamDll.dll、ZZBase.dll已加载."),__LINE__);
-		return 4;
-	}
-	int iRet=0;
+	int iRet=-1;
 	if (g_eloamDll)
 	{
-		iRet=iRet|0x01;
+		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("eloamDll.dll已加载."),__LINE__);
+		return iRet=1;
 	}
 	else
-	{//返回值1表示已加载
+	{
 		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("开始加载动态库eloamDll.dll ..."),__LINE__);
 		g_eloamDll=LoadLibrary(_T("eloamDll.dll"));
 		if (g_eloamDll)
 		{
 			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("eloamDll.dll加载成功."),__LINE__);
-			iRet=iRet|0x01;		
+			iRet=0;		
 		}
 		else
 		{
 			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("eloamDll.dll加载失败."),__LINE__);
-		}
-	}
-	if (g_ZZBaseDll)
-	{
-		iRet=iRet|0x02;
-	}
-	else
-	{//返回值1表示已加载
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("开始加载动态库ZZBase.dll ..."),__LINE__);
-		g_ZZBaseDll=LoadLibrary(_T("ZZBase.dll"));
-		if (g_ZZBaseDll)
-		{
-			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("ZZBase.dll加载成功."),__LINE__);
-			iRet=iRet|0x02;		
-		}
-		else
-		{
-			g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("ZZBase.dll加载失败."),__LINE__);
 		}
 	}
 	return iRet;
@@ -690,63 +660,6 @@ int LoadDllFunction()
 	{
 		return -1;
 	}
-
-
-	//!ZZBase.dll模块函数加载
-	//纠偏裁边初始化函数指针
-	g_ZZInitSdk=(pZZInitSdk)GetFunctionPointer(g_ZZBaseDll,_T("ZZInitSdk"));
-	if (NULL==g_ZZInitSdk)
-	{
-		return -1;
-	}	
-	//纠偏裁边下载图片函数指针
-	g_ZZLoadImage=(pZZLoadImage)GetFunctionPointer(g_ZZBaseDll,_T("ZZLoadImage"));
-	if (NULL==g_ZZLoadImage)
-	{
-		return -1;
-	}
-	//纠偏裁边获取物体区域坐标函数指针
-	g_ZZGetImageObjectRegionPos=(pZZGetImageObjectRegionPos)GetFunctionPointer(g_ZZBaseDll,_T("ZZGetImageObjectRegionPos"));
-	if (NULL==g_ZZGetImageObjectRegionPos)
-	{
-		return -1;
-	}
-	//纠偏裁边从区域坐标信息提取区域信息函数指针
-	g_ZZGetImageRegionInfo=(pZZGetImageRegionInfo)GetFunctionPointer(g_ZZBaseDll,_T("ZZGetImageRegionInfo"));
-	if (NULL==g_ZZGetImageRegionInfo)
-	{
-		return -1;
-	}
-	//纠偏裁边创建图像函数指针
-	g_ZZCreateImage=(pZZCreateImage)GetFunctionPointer(g_ZZBaseDll,_T("ZZCreateImage"));
-	if (NULL==g_ZZCreateImage)
-	{
-		return -1;
-	}
-	//纠偏裁边分离物体函数指针
-	g_ZZSplitImageRegion=(pZZSplitImageRegion)GetFunctionPointer(g_ZZBaseDll,_T("ZZSplitImageRegion"));
-	if (NULL==g_ZZSplitImageRegion)
-	{
-		return -1;
-	}
-	//纠偏裁边保存图片函数指针
-	g_ZZSaveImage=(pZZSaveImage)GetFunctionPointer(g_ZZBaseDll,_T("ZZSaveImage"));
-	if (NULL==g_ZZSaveImage)
-	{
-		return -1;
-	}
-	//纠偏裁边释放图片函数指针
-	g_ZZDestroyImage=(pZZDestroyImage)GetFunctionPointer(g_ZZBaseDll,_T("ZZDestroyImage"));
-	if (NULL==g_ZZDestroyImage)
-	{
-		return -1;
-	}
-	//纠偏裁边反初始化函数指针
-	g_ZZDeinitSdk=(pZZDeinitSdk)GetFunctionPointer(g_ZZBaseDll,_T("ZZDeinitSdk"));
-	if (NULL==g_ZZDeinitSdk)
-	{
-		return -1;
-	}
 	return 0;
 }
 
@@ -897,7 +810,7 @@ int ReleaseDevResource( int userIndex )
 	DevInfo *pDevInfo=GetDevInfo(userIndex,vecIndex);
 	if (NULL==pDevInfo)
 	{
-		g_logOut.StatusOut(Info,_T("(%s) 没有找到对应设备。iDeviceNum=%d  line:%d\r\n"),__FUNCTION__,userIndex,__LINE__);
+		g_logOut.StatusOut(Info,_T("(%s) 没有找到对应设备。iDeviceNum=%d  End. line:%d\r\n"),__FUNCTION__,userIndex,__LINE__);
 		return iRet;
 	}
 	g_pDestroyString(pDevInfo->displayName);
@@ -923,84 +836,4 @@ int ReleaseDevResource( int userIndex )
 	iRet=0;
 
 	return iRet;
-}
-
-BOOL ImageDeskew( HELOAMIMAGE hEloamImg,const char* saveFileName )
-{
-	g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("开始纠偏裁边..."),__LINE__);
-	if (NULL==hEloamImg)
-	{
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("纠偏裁边图片不存在,纠偏裁边失败."),__LINE__);
-		return FALSE;
-	}
-	if (NULL==saveFileName||strcmp(saveFileName,"")==0)
-	{
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("纠偏裁边保存路径不存在,纠偏裁边失败."),__LINE__);
-		return FALSE;
-	}
-	CComBSTR bstrFileName = saveFileName;
-	if (!g_pImageSave(hEloamImg, bstrFileName, 0x0080))
-	{//以高质量的方式暂存图片
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("纠偏裁边原始图片保存失败."),__LINE__);
-		return FALSE;
-	}
-	//开始纠偏裁边处理
-	if (ZZ_ERR_SUCCESS!=g_ZZInitSdk(NULL))
-	{
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("初始化纠偏裁边处理失败."),__LINE__);
-		return FALSE;
-	}
-
-	wchar_t  wsSaveFileName[100];
-	swprintf(wsSaveFileName, 100, L"%hs", saveFileName);
-	//下载图片
-	HIMAGE hImg = NULL;
-	if (ZZ_ERR_SUCCESS!=g_ZZLoadImage(wsSaveFileName, ZZ_IMG_TYPE_COLOR, &hImg)||NULL==hImg)
-	{
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("获取纠偏裁边图像失败."),__LINE__);
-		return FALSE;
-	}
-	//获取物体区域坐标
-	ZZIMAGEREGIONPOS pos;
-	if (ZZ_ERR_SUCCESS!=g_ZZGetImageObjectRegionPos(hImg, &pos))
-	{
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("获取物体区域坐标失败."),__LINE__);
-		g_ZZDestroyImage(hImg);
-		return FALSE;
-	}
-	//从区域坐标信息提取区域信息
-	ZZIMAGEREGIONINFO info;
-	if (ZZ_ERR_SUCCESS!=g_ZZGetImageRegionInfo(&pos, &info))
-	{
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("从区域坐标信息提取区域信息失败."),__LINE__);
-		g_ZZDestroyImage(hImg);
-		return FALSE;
-	}
-	//创建纠偏裁边图像
-	HIMAGE hImg2 = NULL;
-	if (ZZ_ERR_SUCCESS!=g_ZZCreateImage(info.nWidth, info.nHeight, ZZ_IMG_TYPE_COLOR, &hImg2)||NULL==hImg2)
-	{
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("创建纠偏裁边图像失败."),__LINE__);
-		return FALSE;
-	}
-	//分离物体
-	if (ZZ_ERR_SUCCESS!=g_ZZSplitImageRegion(hImg, hImg2, &pos))
-	{
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("分离出物体失败."),__LINE__);
-		g_ZZDestroyImage(hImg2);
-		g_ZZDestroyImage(hImg);
-		return FALSE;
-	}
-	if (ZZ_ERR_SUCCESS!=g_ZZSaveImage(hImg2, wsSaveFileName, 0))
-	{
-		g_logOut.StatusOut(Info,_T("(%s) %s  line:%d\r\n"),__FUNCTION__,_T("纠偏裁边图片保存失败."),__LINE__);
-		g_ZZDestroyImage(hImg2);
-		g_ZZDestroyImage(hImg);
-		return FALSE;
-	}
-	g_ZZDestroyImage(hImg2);
-	g_ZZDestroyImage(hImg);
-	// 反初始化
-	g_ZZDeinitSdk();
-	return TRUE;
 }

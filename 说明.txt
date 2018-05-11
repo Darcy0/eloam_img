@@ -1,0 +1,2 @@
+eloam_img文件夹内工程的图片纠偏裁边实现是:ZZBase.dll
+eloam_img_Deskew文件夹内工程的图片纠偏裁边实现是:eloamDll.dll
